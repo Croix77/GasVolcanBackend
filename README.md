@@ -25,4 +25,18 @@ El servicio inicia en el puerto `8080`. El mensaje `HikariPool-1 - Start complet
 - `.\mvnw.cmd -DskipTests package` compila y genera el archivo JAR.
 - `.\mvnw.cmd test` ejecuta la prueba de contexto con MySQL activo y `DB_PASSWORD` configurada.
 
-El código Java está en `src/main/java`. La conexión a MySQL se configura en `src/main/resources/application.properties`. El siguiente bloque es el catálogo de categorías y productos.
+El código Java está en `src/main/java`. La conexión a MySQL se configura en `src/main/resources/application.properties`.
+
+## API de categorías
+
+| Método | Ruta | Resultado |
+| --- | --- | --- |
+| GET | `/api/v1/categorias` | `200` con la lista de categorías. |
+| GET | `/api/v1/categorias/{id}` | `200` con la categoría o `404` si el id no existe. |
+| POST | `/api/v1/categorias` | `201` con la categoría creada o `400` con un mensaje de error. |
+
+Para crear una categoría, envía JSON con el nombre. MySQL genera el identificador.
+
+```json
+{"nombre": "Cilindros de Gas"}
+```
