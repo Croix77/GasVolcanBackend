@@ -1,0 +1,14 @@
+[Unit]
+Description=Gas El Volcan ms-auth
+After=network.target
+
+[Service]
+User=gasvolcan
+Environment=SERVER_ADDRESS=127.0.0.1
+EnvironmentFile=/etc/gasvolcan/ms-auth.env
+ExecStart=/usr/bin/java -jar /opt/ms-auth/app.jar
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

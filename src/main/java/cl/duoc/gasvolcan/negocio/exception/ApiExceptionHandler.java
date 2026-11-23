@@ -29,6 +29,16 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", error.getMessage()));
     }
 
+    @ExceptionHandler(NegocioInvalidoException.class)
+    public ResponseEntity<Map<String, String>> negocioInvalido(NegocioInvalidoException error) {
+        return ResponseEntity.badRequest().body(Map.of("error", error.getMessage()));
+    }
+
+    @ExceptionHandler(ConflictoNegocioException.class)
+    public ResponseEntity<Map<String, String>> conflicto(ConflictoNegocioException error) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", error.getMessage()));
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, String>> jsonInvalido() {
         return ResponseEntity.badRequest().body(Map.of("error", "Envía un cuerpo JSON válido."));
@@ -37,6 +47,6 @@ public class ApiExceptionHandler {
     // La base mantiene la unicidad incluso si llegan dos solicitudes a la vez.
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, String>> restriccionDeDatos() {
-        return ResponseEntity.badRequest().body(Map.of("error", "Los datos no cumplen una restricción de la base."));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "La operación entra en conflicto con los datos registrados."));
     }
 }
