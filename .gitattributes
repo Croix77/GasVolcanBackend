@@ -1,2 +1,3 @@
 /ms-negocio/mvnw text eol=lf
 *.cmd text eol=crlf
+/ensayo/*/mvnw text eol=lf
