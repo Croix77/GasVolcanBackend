@@ -4,7 +4,7 @@ Adaptación de la Guía 18 con Nginx, dos servicios Java y dos esquemas MySQL o 
 
 ## 1. Preparar los artefactos
 
-- Ejecuta `./mvnw verify` con Java 17 en `ms-auth` y `ms-negocio`.
+- Ejecuta `./mvnw verify` con Java 17 desde `GasVolcanAuth/ms-auth` y `GasVolcanBackend/ms-negocio`.
 - Ejecuta `npm ci`, `npm test` y `npm run build` en React. Elimina de ese entorno las variables `VITE_AUTH_URL` y `VITE_NEGOCIO_URL` para que el build use el mismo dominio que Nginx.
 - En EC2, instala Java 17 o superior, MySQL o MariaDB y Nginx. Crea los esquemas `gas_volcan_auth` y `gas_volcan_negocio` con una cuenta distinta por esquema.
 - Copia los JAR a `/opt/ms-auth/app.jar` y `/opt/ms-negocio/app.jar`. Copia el contenido de `dist/` a `/var/www/gasvolcan`.
@@ -44,10 +44,10 @@ sudo systemctl reload nginx
 La plantilla [Dockerfile](Dockerfile) empaqueta cada JAR de forma independiente. Ejecuta los builds desde las carpetas de los respectivos servicios. El primer argumento de archivo debe apuntar al Dockerfile de esta carpeta.
 
 ```sh
-# En ms-auth
+# En GasVolcanAuth/ms-auth
 docker build -f /ruta/GasVolcanBackend/deploy/Dockerfile --build-arg JAR=target/ms-auth-0.0.1-SNAPSHOT.jar -t ms-auth .
-# En ms-negocio
-docker build -f deploy/Dockerfile --build-arg JAR=target/ms-negocio-0.0.1-SNAPSHOT.jar -t ms-negocio .
+# En GasVolcanBackend/ms-negocio
+docker build -f ../deploy/Dockerfile --build-arg JAR=target/ms-negocio-0.0.1-SNAPSHOT.jar -t ms-negocio .
 ```
 
 Para mantener las bases y Nginx en el host Linux, puedes arrancar cada imagen con `--network host`, el archivo de entorno correspondiente y `-e SERVER_ADDRESS=127.0.0.1`. Usa un solo método de arranque por puerto en la misma instancia. La opción systemd reproduce el procedimiento de la Guía 18.
