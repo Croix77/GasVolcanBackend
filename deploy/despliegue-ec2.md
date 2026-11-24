@@ -16,13 +16,13 @@ Cada proceso recibe la misma clave `JWT_SECRET` en Base64 de al menos 32 bytes y
 | `ms-pedidos` | `PORT=8084`, `DB_URL`, `DB_USER`, `DB_PASSWORD`, `PRODUCTOS_URL=http://127.0.0.1:8083` |
 | `ms-despacho` | `PORT=8085`, `AUTH_URL=http://127.0.0.1:8081`, `PEDIDOS_URL=http://127.0.0.1:8084` |
 
-En cada URL JDBC usa `jdbc:mysql://127.0.0.1:3306/` seguido del esquema del servicio. Para levantar una base nueva en local, configura `AUTH_DB_DDL_AUTO=update` o `DB_DDL_AUTO=update`. Para crear el primer administrador, sigue las instrucciones del [README de Auth](https://github.com/Croix77/GasVolcanAuth). Si estás migrando un sistema existente, prepara las tablas vacías y sigue la [migración](migracion.md).
+En cada URL JDBC usa `jdbc:mysql://127.0.0.1:3306/` seguido del esquema del servicio. Para levantar una base nueva en local, configura `AUTH_DB_DDL_AUTO=update` o `DB_DDL_AUTO=update`. Para crear el primer administrador, sigue las instrucciones del [README de Auth](../ms-auth/README.md). Si estás migrando un sistema existente, prepara las tablas vacías y sigue la [migración](migracion.md).
 
 Para una **demostración nueva** puedes cargar datos ficticios con `APP_SEED_CATALOGO=true` en Categorías y Productos y `APP_SEED_STOCK=true` en Pedidos. Inicia Categorías antes de Productos. En local arranca cada carpeta con `mvnw.cmd spring-boot:run`. Arranca React con `npm ci` y `npm run dev`. Su proxy Vite usa los cinco puertos de la tabla.
 
 ## 2. Compilar y publicar en EC2
 
-1. Ejecuta `./mvnw verify` dentro de cada microservicio con Java 17. Copia los JAR compilados a `/opt/<nombre-del-servicio>/app.jar`.
+1. Clona GasVolcanBackend y ejecuta `./mvnw verify` en cada una de sus cinco carpetas de servicio con Java 17. Copia los JAR compilados a `/opt/<nombre-del-servicio>/app.jar`.
 2. Ejecuta `npm ci`, `npm test` y `npm run build` en React. Copia el contenido de `dist/` a `/var/www/gasvolcan`.
 3. Crea el usuario de sistema `gasvolcan` con lectura de los JAR. Para cada servicio coloca su archivo `/etc/gasvolcan/<nombre-del-servicio>.env` con `SPRING_PROFILES_ACTIVE=prod` y las variables anteriores. Cambia la opción de DDL a `validate` después de preparar y comprobar las tablas. Desactiva las semillas después de iniciar.
 4. Instala las cinco plantillas `.service` de esta carpeta en `/etc/systemd/system/`. Usa `sudo systemctl daemon-reload` y `sudo systemctl enable --now ms-auth ms-categorias ms-productos ms-pedidos ms-despacho`.

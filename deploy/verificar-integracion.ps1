@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory)] [string]$AuthJar,
+    [string]$AuthJar,
     [Parameter(Mandatory)] [string]$MysqlHome,
     [Parameter(Mandatory)] [string]$Java,
     [string]$LegacyJar,
@@ -8,11 +8,12 @@ param(
     [string]$Edge
 )
 $ErrorActionPreference = 'Stop'
+$directorio = Split-Path -Parent $PSScriptRoot
+if (!$AuthJar) { $AuthJar = Join-Path $directorio 'ms-auth/target/ms-auth-0.0.1-SNAPSHOT.jar' }
 $authJar = (Resolve-Path -LiteralPath $AuthJar).Path
 $java = (Resolve-Path -LiteralPath $Java).Path
 $mysqlHome = (Resolve-Path -LiteralPath $MysqlHome).Path
 $mysqlServer = Join-Path $mysqlHome 'bin/mysqld.exe'
-$directorio = Split-Path -Parent $PSScriptRoot
 $jars = @{}
 foreach ($nombre in 'ms-categorias','ms-productos','ms-pedidos','ms-despacho') {
     $jars[$nombre] = (Resolve-Path (Join-Path $directorio "$nombre/target/$nombre-0.0.1-SNAPSHOT.jar")).Path
