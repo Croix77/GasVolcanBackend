@@ -26,4 +26,4 @@ Ejecuta Java 17 y Maven Wrapper desde cada carpeta. En Windows:
 .\mvnw.cmd verify
 ```
 
-[Prueba integrada](deploy/verificar-integracion.ps1) levanta los cinco procesos y usa bases MySQL aisladas. Verifica roles, CRUD, precios, la última unidad, reintentos, caída de catálogo y despacho. El parámetro opcional `-LegacyJar` prueba la migración desde el JAR de `ms-negocio`. Mantén los archivos de entorno reales y los artefactos de compilación fuera de Git.
+[Prueba integrada](deploy/verificar-integracion.ps1) levanta los cinco procesos y usa bases MySQL aisladas. Verifica roles, CRUD, precios, la última unidad, reintentos, caída de catálogo y despacho. El parámetro opcional `-LegacyJar` prueba la migración desde el JAR de `ms-negocio`. Pasa `-Frontend`, `-Nginx` y `-Edge` para comprobar además el sitio compilado en el navegador. Mantén los archivos de entorno reales y los artefactos de compilación fuera de Git.

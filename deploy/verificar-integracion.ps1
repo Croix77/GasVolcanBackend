@@ -347,7 +347,7 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
         $webPort = Puerto-Libre
         $cdp = Puerto-Libre
         $origen = "http://127.0.0.1:$webPort"
-        New-Item -ItemType Directory -Path (Join-Path $temp 'logs') | Out-Null
+        New-Item -ItemType Directory -Path @((Join-Path $temp 'logs'), (Join-Path $temp 'temp')) | Out-Null
 
         $config = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'gasvolcan.conf') -Raw)
         $config = $config.Replace('listen 80;', "listen 127.0.0.1:$webPort;").Replace('root /var/www/gasvolcan;', "root '$frontPath';")
