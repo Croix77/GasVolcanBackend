@@ -7,6 +7,7 @@ import cl.duoc.gasvolcan.pedidos.dto.PedidoSolicitud;
 import cl.duoc.gasvolcan.pedidos.dto.UbicacionPedidoSolicitud;
 import cl.duoc.gasvolcan.pedidos.service.PedidoService;
 import cl.duoc.gasvolcan.pedidos.service.CompraService;
+import cl.duoc.gasvolcan.pedidos.service.NotificacionesClient;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.time.LocalDate;
@@ -32,10 +33,12 @@ public class PedidoController {
 
     private final PedidoService pedidos;
     private final CompraService compras;
+    private final NotificacionesClient notificaciones;
 
-    public PedidoController(PedidoService pedidos, CompraService compras) {
+    public PedidoController(PedidoService pedidos, CompraService compras, NotificacionesClient notificaciones) {
         this.pedidos = pedidos;
         this.compras = compras;
+        this.notificaciones = notificaciones;
     }
 
     @PostMapping("/pedidos")
@@ -44,6 +47,7 @@ public class PedidoController {
         try {
             PedidoService.Compra compra = compras.comprar(solicitud, usuario);
             if (!compra.nueva()) return ResponseEntity.ok(compra.pedido());
+            notificaciones.avisarPedido(compra.pedido());
             return ResponseEntity.created(URI.create("/api/v1/pedidos/" + compra.pedido().id())).body(compra.pedido());
         } catch (DataIntegrityViolationException conflicto) {
             // Si dos envíos coinciden, la transacción perdedora ya se revirtió; se consulta la confirmada.

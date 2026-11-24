@@ -14,7 +14,7 @@ $mysqlHome = (Resolve-Path -LiteralPath $MysqlHome).Path
 $mysqlServer = Join-Path $mysqlHome 'bin/mysqld.exe'
 $directorio = Split-Path -Parent $PSScriptRoot
 $jars = @{}
-foreach ($nombre in 'ms-categorias','ms-productos','ms-pedidos','ms-despacho') {
+foreach ($nombre in 'ms-categorias','ms-productos','ms-pedidos','ms-despacho','ms-notificaciones') {
     $jars[$nombre] = (Resolve-Path (Join-Path $directorio "$nombre/target/$nombre-0.0.1-SNAPSHOT.jar")).Path
 }
 $temp = Join-Path ([IO.Path]::GetTempPath()) ('gas-volcan-ensayo-' + [guid]::NewGuid().ToString('N'))
@@ -59,9 +59,10 @@ function Abrir-Proceso([string]$ejecutable, [string[]]$argumentos, [string]$nomb
 function Abrir-Jar([string]$jar, [string]$nombre, [hashtable]$variables) {
     Abrir-Proceso $java @('-Xms32m','-Xmx320m','-jar',('"' + $jar + '"'),'--server.address=127.0.0.1') $nombre $variables
 }
-function Nueva-Peticion([string]$metodo, [string]$url, [string]$token, [object]$body) {
+function Nueva-Peticion([string]$metodo, [string]$url, [string]$token, [object]$body, [string]$clave = '') {
     $r = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::new($metodo), $url)
     if ($token) { $r.Headers.Authorization = [Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer', $token) }
+    if ($clave) { $r.Headers.TryAddWithoutValidation('X-Notificaciones-Key', $clave) | Out-Null }
     if ($null -ne $body) {
         $json = ConvertTo-Json -Compress -Depth 10 -InputObject $body
         $r.Content = [Net.Http.StringContent]::new($json, [Text.Encoding]::UTF8, 'application/json')
@@ -75,8 +76,8 @@ function Resultado([Net.Http.HttpResponseMessage]$respuesta) {
         return @{ Estado = [int]$respuesta.StatusCode; Datos = $data }
     } finally { $respuesta.Dispose() }
 }
-function Llamar([string]$metodo, [string]$url, [int]$estado, [string]$token = '', [object]$body = $null) {
-    $r = Nueva-Peticion $metodo $url $token $body
+function Llamar([string]$metodo, [string]$url, [int]$estado, [string]$token = '', [object]$body = $null, [string]$clave = '') {
+    $r = Nueva-Peticion $metodo $url $token $body $clave
     try {
         $salida = Resultado ($http.SendAsync($r).GetAwaiter().GetResult())
         if ($salida.Estado -ne $estado) { throw "$metodo $url esperaba HTTP $estado. Respondió $($salida.Estado)." }
@@ -106,22 +107,26 @@ try {
     $productosPort = Puerto-Libre
     $pedidosPort = Puerto-Libre
     $despachoPort = Puerto-Libre
+    $notificacionesPort = Puerto-Libre
     $legacyPort = Puerto-Libre
     $authBase = "http://127.0.0.1:$authPort"
     $categoriasBase = "http://127.0.0.1:$categoriasPort"
     $productoBase = "http://127.0.0.1:$productosPort"
     $pedidoBase = "http://127.0.0.1:$pedidosPort"
     $despacho = "http://127.0.0.1:$despachoPort/api/v1/despacho"
+    $notificacionesBase = "http://127.0.0.1:$notificacionesPort"
     $jwt = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
     $rootDbClave = Nueva-Clave
     $authDbClave = Nueva-Clave
     $categoriasDbClave = Nueva-Clave
     $productosDbClave = Nueva-Clave
     $pedidosDbClave = Nueva-Clave
+    $notificacionesDbClave = Nueva-Clave
     $adminClave = Nueva-Clave
     $clienteClave = Nueva-Clave
     $adminCorreo = 'admin@example.test'
     $catalogoToken = Nueva-Clave
+    $notificacionesToken = Nueva-Clave
     $legacyDbClave = Nueva-Clave
     $usarSemillas = if ($LegacyJar) { 'false' } else { 'true' }
 
@@ -132,15 +137,18 @@ CREATE DATABASE gas_volcan_auth CHARACTER SET utf8mb4;
 CREATE DATABASE gas_volcan_categorias CHARACTER SET utf8mb4;
 CREATE DATABASE gas_volcan_productos CHARACTER SET utf8mb4;
 CREATE DATABASE gas_volcan_pedidos CHARACTER SET utf8mb4;
+CREATE DATABASE gas_volcan_notificaciones CHARACTER SET utf8mb4;
 CREATE DATABASE gas_volcan_negocio CHARACTER SET utf8mb4;
 CREATE USER 'auth_ensayo'@'127.0.0.1' IDENTIFIED BY '$authDbClave';
 CREATE USER 'categorias_ensayo'@'127.0.0.1' IDENTIFIED BY '$categoriasDbClave';
 CREATE USER 'productos_ensayo'@'127.0.0.1' IDENTIFIED BY '$productosDbClave';
 CREATE USER 'pedidos_ensayo'@'127.0.0.1' IDENTIFIED BY '$pedidosDbClave';
+CREATE USER 'notificaciones_ensayo'@'127.0.0.1' IDENTIFIED BY '$notificacionesDbClave';
 GRANT ALL PRIVILEGES ON gas_volcan_auth.* TO 'auth_ensayo'@'127.0.0.1';
 GRANT ALL PRIVILEGES ON gas_volcan_categorias.* TO 'categorias_ensayo'@'127.0.0.1';
 GRANT ALL PRIVILEGES ON gas_volcan_productos.* TO 'productos_ensayo'@'127.0.0.1';
 GRANT ALL PRIVILEGES ON gas_volcan_pedidos.* TO 'pedidos_ensayo'@'127.0.0.1';
+GRANT ALL PRIVILEGES ON gas_volcan_notificaciones.* TO 'notificaciones_ensayo'@'127.0.0.1';
 CREATE USER 'legacy_ensayo'@'127.0.0.1' IDENTIFIED BY '$legacyDbClave';
 GRANT ALL PRIVILEGES ON gas_volcan_negocio.* TO 'legacy_ensayo'@'127.0.0.1';
 ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
@@ -167,10 +175,15 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
     $productos = Abrir-Jar $jars['ms-productos'] 'productos' $productoVars
     $pedidos = Abrir-Jar $jars['ms-pedidos'] 'pedidos' @{
         PORT="$pedidosPort"; JWT_SECRET=$jwt; PRODUCTOS_URL=$productoBase; APP_SEED_STOCK=$usarSemillas
+        NOTIFICACIONES_URL=$notificacionesBase; NOTIFICACIONES_INTERNO_TOKEN=$notificacionesToken
         DB_URL="$jdbc/gas_volcan_pedidos?$opcionesJdbc"; DB_USER='pedidos_ensayo'; DB_PASSWORD=$pedidosDbClave
     }
     $reparto = Abrir-Jar $jars['ms-despacho'] 'despacho' @{
         PORT="$despachoPort"; JWT_SECRET=$jwt; PEDIDOS_URL=$pedidoBase; AUTH_URL=$authBase
+    }
+    $avisos = Abrir-Jar $jars['ms-notificaciones'] 'notificaciones' @{
+        PORT="$notificacionesPort"; JWT_SECRET=$jwt; NOTIFICACIONES_INTERNO_TOKEN=$notificacionesToken
+        DB_URL="$jdbc/gas_volcan_notificaciones?$opcionesJdbc"; DB_USER='notificaciones_ensayo'; DB_PASSWORD=$notificacionesDbClave
     }
 
     Esperar-Puerto $authPort $auth 'ms-auth'
@@ -178,6 +191,7 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
     Esperar-Puerto $productosPort $productos 'ms-productos'
     Esperar-Puerto $pedidosPort $pedidos 'ms-pedidos'
     Esperar-Puerto $despachoPort $reparto 'ms-despacho'
+    Esperar-Puerto $notificacionesPort $avisos 'ms-notificaciones'
     Start-Sleep -Seconds 2
     Remove-Item -LiteralPath $initSql -ErrorAction SilentlyContinue
 
@@ -252,7 +266,7 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
     $null = Llamar 'GET' $despacho 403 $tokens.clienteA
     $categoria = Llamar 'GET' "$categoriasBase/api/v1/categorias/1" 200 $tokens.clienteA
     $ficha = Llamar 'GET' $rutaProducto 200 $tokens.clienteA
-    Probar ($categoria.id -eq 1 -and $ficha.precio -eq 5900) 'Cinco servicios arrancan y respetan permisos JWT'
+    Probar ($categoria.id -eq 1 -and $ficha.precio -eq 5900) 'Seis servicios arrancan y respetan permisos JWT'
 
     $categoriasRuta = "$categoriasBase/api/v1/categorias"
     $productosRuta = "$productoBase/api/v1/productos"
@@ -337,6 +351,23 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
     $null = Llamar 'PATCH' "$authBase/api/auth/usuarios/$($cuentasIds['repartidorB'])/estado" 200 $admin @{activo=$false}
     $null = Llamar 'PATCH' "$despacho/$otroId/estado" 401 $tokens.repartidorB @{estado='EN_CAMINO'}
     Probar ((Llamar 'GET' "$rutaPedido/$otroId" 200 $tokens.clienteA).estado -eq 'ASIGNADO') 'Un repartidor desactivado no modifica su entrega aunque conserve el JWT'
+
+    $rutaAvisos = "$notificacionesBase/api/v1/notificaciones"
+    $rutaAvisosInterna = "$notificacionesBase/api/v1/interno/notificaciones"
+    $aviso = @{ canal='WHATSAPP'; destino='912345678'; asunto='Entrega'; mensaje='Tu pedido está en camino.'; referencia="pedido-$($ganador.id)"; idempotencia='aviso-entrega-prueba' }
+    $null = Llamar 'GET' $rutaAvisos 401
+    $null = Llamar 'GET' $rutaAvisos 403 $tokens.clienteA
+    $null = Llamar 'POST' $rutaAvisosInterna 403 '' $aviso
+    $null = Llamar 'POST' $rutaAvisosInterna 400 '' @{ canal='EMAIL'; destino='sin-arroba'; mensaje='Hola' } $notificacionesToken
+    $creado = Llamar 'POST' $rutaAvisosInterna 201 '' $aviso $notificacionesToken
+    $repetido = Llamar 'POST' $rutaAvisosInterna 200 '' $aviso $notificacionesToken
+    $leido = Llamar 'GET' "$rutaAvisos/$($creado.id)" 200 $tokens.operadora
+    $avisoPedido = (Llamar 'GET' $rutaAvisos 200 $tokens.operadora) |
+        Where-Object { $_.idempotencia -eq "pedido-$($ganador.id)" } | Select-Object -First 1
+    Probar ($creado.estado -eq 'SIMULADO' -and $creado.simulado -eq $true -and $creado.proveedor -eq 'SIMULADO' -and
+             $leido.referencia -eq "pedido-$($ganador.id)") 'Notificaciones exige clave interna, valida el destino y marca la simulación'
+    Probar ($repetido.id -eq $creado.id) 'Un aviso repetido con la misma idempotencia no crea otro registro'
+    Probar ($avisoPedido -and $avisoPedido.estado -eq 'SIMULADO' -and $avisoPedido.simulado -eq $true) 'Pedidos avisa sin bloquear la compra y deja el aviso identificable'
     if ($Frontend) {
         if (!$Nginx -or !$Edge) { throw 'Pasa -Nginx y -Edge para comprobar React compilado en navegador.' }
         $frontPath = (Resolve-Path (Join-Path $Frontend 'dist')).Path.Replace('\','/')
@@ -351,7 +382,7 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
 
         $config = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'gasvolcan.conf') -Raw)
         $config = $config.Replace('listen 80;', "listen 127.0.0.1:$webPort;").Replace('root /var/www/gasvolcan;', "root '$frontPath';")
-        foreach ($par in @(@(8081,$authPort),@(8082,$categoriasPort),@(8083,$productosPort),@(8084,$pedidosPort),@(8085,$despachoPort))) {
+        foreach ($par in @(@(8081,$authPort),@(8082,$categoriasPort),@(8083,$productosPort),@(8084,$pedidosPort),@(8085,$despachoPort),@(8087,$notificacionesPort))) {
             $config = $config.Replace("proxy_pass http://127.0.0.1:$($par[0]);", "proxy_pass http://127.0.0.1:$($par[1]);")
         }
         $prefijo = @"
@@ -377,8 +408,10 @@ http {
         $null = Llamar 'GET' "$origen/api/v1/productos" 200 $tokens.clienteA
         $null = Llamar 'GET' "$origen/api/v1/stock" 200 $tokens.clienteA
         $null = Llamar 'GET' "$origen/api/v1/despacho" 200 $tokens.operadora
+        $null = Llamar 'GET' "$origen/api/v1/notificaciones" 200 $tokens.operadora
         $privada = Invoke-WebRequest -Uri "$origen/api/v1/interno/pedidos/$($ganador.id)/estado" -SkipHttpErrorCheck -TimeoutSec 10
-        Probar ($privada.StatusCode -eq 404) 'Nginx dirige las rutas públicas y oculta las rutas internas'
+        $privadaAvisos = Invoke-WebRequest -Uri "$origen/api/v1/interno/notificaciones" -SkipHttpErrorCheck -TimeoutSec 10
+        Probar ($privada.StatusCode -eq 404 -and $privadaAvisos.StatusCode -eq 404) 'Nginx dirige las rutas públicas y oculta las rutas internas'
 
         $edgeDir = Join-Path $temp 'edge'
         $navegador = Abrir-Proceso $edgePath @('--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check',"--remote-debugging-port=$cdp",('--user-data-dir="' + $edgeDir + '"'),'about:blank') 'edge'

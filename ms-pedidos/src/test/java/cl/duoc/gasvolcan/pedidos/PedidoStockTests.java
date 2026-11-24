@@ -42,7 +42,9 @@ class PedidoStockTests {
     private static final String PEDIDOS = "/api/v1/pedidos";
     private static final AtomicInteger PRECIO = new AtomicInteger(16000);
     private static final AtomicInteger LLAMADAS = new AtomicInteger();
+    private static final AtomicInteger AVISOS = new AtomicInteger();
     private static final HttpServer CATALOGO = catalogo();
+    private static final HttpServer NOTIFICACIONES = notificaciones();
 
     @LocalServerPort
     int puerto;
@@ -55,6 +57,8 @@ class PedidoStockTests {
     @DynamicPropertySource
     static void urlCatalogo(DynamicPropertyRegistry registro) {
         registro.add("app.catalogo.productos-url", () -> "http://127.0.0.1:" + CATALOGO.getAddress().getPort());
+        registro.add("app.notificaciones.url", () -> "http://127.0.0.1:" + NOTIFICACIONES.getAddress().getPort());
+        registro.add("app.notificaciones.token", () -> "notificaciones-pruebas-locales-0123456789-abcdef");
     }
 
     @BeforeEach
@@ -68,6 +72,7 @@ class PedidoStockTests {
     @AfterAll
     static void cerrarCatalogoDePrueba() {
         CATALOGO.stop(0);
+        NOTIFICACIONES.stop(0);
     }
 
     @Test
@@ -121,6 +126,21 @@ class PedidoStockTests {
     }
 
     @Test
+    void unaNotificacionFallidaNoRevierteElPedidoNiElStock() throws Exception {
+        String correo = "aviso-fallido@example.test";
+        String datos = datos("[{\"id\":\"gas-15kg\",\"cantidad\":1,\"precioEsperado\":16000}]",
+                UUID.randomUUID());
+        int antes = AVISOS.get();
+
+        JsonNode pedido = enviar("POST", PEDIDOS, correo, datos, 201);
+
+        assertThat(AVISOS.get()).isEqualTo(antes + 1);
+        assertThat(pedido.path("total").asLong()).isEqualTo(16000);
+        assertThat(existencias.findById("gas-15kg").orElseThrow().getStock()).isEqualTo(3);
+        assertThat(enviar("GET", PEDIDOS, correo, null, 200).size()).isEqualTo(1);
+    }
+
+    @Test
     void stockAdministrativoUsaLaVersionDeLaUltimaLectura() throws Exception {
         String ruta = "/api/v1/stock/gas-15kg";
         String correo = "stock@example.test";
@@ -166,6 +186,24 @@ class PedidoStockTests {
             """, UUID.randomUUID()).replaceFirst(",\\s*\"referenciaCompra\":\"[^\"]+\"", "");
         enviar("POST", PEDIDOS, correo, sinReferencia, 400);
         assertThat(existencias.findById("gas-5kg").orElseThrow().getStock()).isEqualTo(1);
+    }
+
+    private static HttpServer notificaciones() {
+        try {
+            HttpServer servidor = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            servidor.createContext("/api/v1/interno/notificaciones", intercambio -> {
+                AVISOS.incrementAndGet();
+                byte[] cuerpo = "{\"error\":\"proveedor no disponible\"}".getBytes(StandardCharsets.UTF_8);
+                intercambio.getResponseHeaders().set("Content-Type", "application/json");
+                intercambio.sendResponseHeaders(503, cuerpo.length);
+                intercambio.getResponseBody().write(cuerpo);
+                intercambio.close();
+            });
+            servidor.start();
+            return servidor;
+        } catch (IOException error) {
+            throw new IllegalStateException("No se pudo iniciar el servidor de notificaciones de prueba.", error);
+        }
     }
 
     private static HttpServer catalogo() {
