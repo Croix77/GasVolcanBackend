@@ -1,53 +1,43 @@
-# Despliegue en AWS EC2
+# Ejecutar Gas El Volcán
 
-Adaptación de la Guía 18 con Nginx, dos servicios Java y dos esquemas MySQL o MariaDB. Se ejecuta después de verificar las tres ramas en local.
+Adaptación de la Guía 18. Nginx sirve React y envía las APIs a los puertos internos. MySQL o MariaDB guardan los datos. `systemd` mantiene los cinco JAR activos.
 
-## 1. Preparar los artefactos
+## 1. Configurar bases y variables
 
-- Ejecuta `./mvnw verify` con Java 17 desde `GasVolcanAuth/ms-auth` y `GasVolcanBackend/ms-negocio`.
-- Ejecuta `npm ci`, `npm test` y `npm run build` en React. Elimina de ese entorno las variables `VITE_AUTH_URL` y `VITE_NEGOCIO_URL` para que el build use el mismo dominio que Nginx.
-- En EC2, instala Java 17 o superior, MySQL o MariaDB y Nginx. Crea los esquemas `gas_volcan_auth` y `gas_volcan_negocio` con una cuenta distinta por esquema.
-- Copia los JAR a `/opt/ms-auth/app.jar` y `/opt/ms-negocio/app.jar`. Copia el contenido de `dist/` a `/var/www/gasvolcan`.
+Crea los esquemas `gas_volcan_auth`, `gas_volcan_categorias`, `gas_volcan_productos` y `gas_volcan_pedidos` con caracteres `utf8mb4`. Crea una cuenta distinta para cada esquema y concede permisos solo sobre su esquema. Despacho consulta las APIs y utiliza los pedidos persistidos por `ms-pedidos`.
 
-## 2. Configurar secretos y servicios
+Cada proceso recibe la misma clave `JWT_SECRET` en Base64 de al menos 32 bytes y el emisor `gasvolcan-auth`. Usa una segunda clave, `CATALOGO_INTERNO_TOKEN`, compartida solo por Categorías y Productos para verificar asociaciones internas. Genera los valores para tu entorno y guárdalos en archivos de entorno con permisos `0600`.
 
-Crea un usuario local de servicio `gasvolcan` con lectura de los JAR. Crea `/etc/gasvolcan/ms-auth.env` y `/etc/gasvolcan/ms-negocio.env` con permisos de lectura exclusivos para el administrador del servidor (`0600`). Ambos archivos deben tener `JWT_SECRET` con la misma clave Base64 y `SPRING_PROFILES_ACTIVE=prod`.
+| Servicio | Variables específicas |
+| --- | --- |
+| `ms-auth` | `AUTH_PORT=8081`, `AUTH_DB_URL`, `AUTH_DB_USER`, `AUTH_DB_PASSWORD` |
+| `ms-categorias` | `PORT=8082`, `DB_URL`, `DB_USER`, `DB_PASSWORD`, `CATALOGO_INTERNO_TOKEN` |
+| `ms-productos` | `PORT=8083`, `DB_URL`, `DB_USER`, `DB_PASSWORD`, `CATALOGO_INTERNO_TOKEN`, `CATEGORIAS_URL=http://127.0.0.1:8082` |
+| `ms-pedidos` | `PORT=8084`, `DB_URL`, `DB_USER`, `DB_PASSWORD`, `PRODUCTOS_URL=http://127.0.0.1:8083` |
+| `ms-despacho` | `PORT=8085`, `AUTH_URL=http://127.0.0.1:8081`, `PEDIDOS_URL=http://127.0.0.1:8084` |
 
-- Auth recibe `AUTH_DB_URL`, `AUTH_DB_USER`, `AUTH_DB_PASSWORD` y escucha por defecto en `8081`. Inicializa el esquema y el primer administrador con el procedimiento de su README. Para el primer arranque controlado usa `AUTH_DB_DDL_AUTO=update` y perfil `local`. Retira los parámetros de creación del administrador y vuelve a `prod` tras comprobar el acceso.
-- Negocio recibe `DB_URL`, `DB_USER`, `DB_PASSWORD` y escucha por defecto en `8080`. Si su esquema está vacío, permite `DB_DDL_AUTO=update` durante el primer arranque. Para cargar el catálogo académico configura también `APP_SEED_CATALOGO=true`. Después usa `validate` y desactiva la carga inicial.
-- Para Nginx con HTTPS, configura `APP_CORS_ORIGINS=https://tu-dominio` en ambos archivos si publicas ese dominio. El GPS del navegador requiere HTTPS o localhost. La interfaz permite marcar coordenadas manualmente.
+En cada URL JDBC usa `jdbc:mysql://127.0.0.1:3306/` seguido del esquema del servicio. Para levantar una base nueva en local, configura `AUTH_DB_DDL_AUTO=update` o `DB_DDL_AUTO=update`. Para crear el primer administrador, sigue las instrucciones del [README de Auth](https://github.com/Croix77/GasVolcanAuth). Si estás migrando un sistema existente, prepara las tablas vacías y sigue la [migración](migracion.md).
 
-Copia los dos archivos `.service` de esta carpeta a `/etc/systemd/system/`. Comprueba que el nombre de la cuenta del sistema coincida con `User=` antes de levantar ambos servicios.
+Para una **demostración nueva** puedes cargar datos ficticios con `APP_SEED_CATALOGO=true` en Categorías y Productos y `APP_SEED_STOCK=true` en Pedidos. Inicia Categorías antes de Productos. En local arranca cada carpeta con `mvnw.cmd spring-boot:run`. Arranca React con `npm ci` y `npm run dev`. Su proxy Vite usa los cinco puertos de la tabla.
 
-```sh
-sudo systemctl daemon-reload
-sudo systemctl enable --now ms-auth ms-negocio
-sudo systemctl status ms-auth ms-negocio --no-pager
-```
+## 2. Compilar y publicar en EC2
 
-## 3. Publicar con Nginx y probar
+1. Ejecuta `./mvnw verify` dentro de cada microservicio con Java 17. Copia los JAR compilados a `/opt/<nombre-del-servicio>/app.jar`.
+2. Ejecuta `npm ci`, `npm test` y `npm run build` en React. Copia el contenido de `dist/` a `/var/www/gasvolcan`.
+3. Crea el usuario de sistema `gasvolcan` con lectura de los JAR. Para cada servicio coloca su archivo `/etc/gasvolcan/<nombre-del-servicio>.env` con `SPRING_PROFILES_ACTIVE=prod` y las variables anteriores. Cambia la opción de DDL a `validate` después de preparar y comprobar las tablas. Desactiva las semillas después de iniciar.
+4. Instala las cinco plantillas `.service` de esta carpeta en `/etc/systemd/system/`. Usa `sudo systemctl daemon-reload` y `sudo systemctl enable --now ms-auth ms-categorias ms-productos ms-pedidos ms-despacho`.
+5. Instala [gasvolcan.conf](gasvolcan.conf), verifica con `sudo nginx -t` y recarga Nginx. El grupo de seguridad abre solo los puertos de ingreso necesarios para SSH y el sitio web. Los cinco servicios escuchan en loopback y las rutas `/api/v1/interno/` quedan fuera del sitio público.
 
-Instala el bloque de [gasvolcan.conf](gasvolcan.conf) en la configuración del sitio. Comprueba las reglas de AWS del puerto HTTP/HTTPS que vayas a utilizar. Los puertos de Java y MySQL se usan internamente. En una instancia con sitios existentes, asigna `server_name` al dominio de Gas El Volcán.
+Configura HTTPS si vas a usar el GPS del dispositivo. La entrada manual de coordenadas está disponible para la presentación. Al terminar, comprueba login, compra, asignación, entrega, historial y recargar una ruta de React. Revisa con `systemctl status` que los procesos vuelvan al reiniciar EC2.
 
-```sh
-sudo nginx -t
-sudo systemctl reload nginx
-```
+Para Swagger usa túneles SSH a los puertos de los servicios y activa `SWAGGER_ENABLED=true` en los servicios documentados durante la revisión. Las rutas públicas permanecen en el dominio de Nginx.
 
-1. Entra como administrador y crea cuentas ficticias de cliente, vendedor, operadora y repartidor.
-2. Con cada cuenta, comprueba su menú y prueba acceder a una ruta que le corresponda y a otra restringida.
-3. Compra como cliente marcando el punto de entrega. Asigna desde la cuenta operadora, cambia el pedido a En camino, registra la ubicación con la cuenta asignada y termina con Entregado. Comprueba el pago y el mapa desde el historial.
-4. Abre una ruta interna directamente desde el navegador y recárgala. Reinicia la instancia de prueba y comprueba que ambos servicios y Nginx vuelvan a iniciarse.
+## Docker del caso
 
-## Empaquetado Docker del caso
-
-La plantilla [Dockerfile](Dockerfile) empaqueta cada JAR de forma independiente. Ejecuta los builds desde las carpetas de los respectivos servicios. El primer argumento de archivo debe apuntar al Dockerfile de esta carpeta.
+La [plantilla Dockerfile](Dockerfile) empaqueta cada JAR por separado desde la carpeta del servicio. Cambia el primer argumento de archivo a la ruta que corresponde a este repositorio.
 
 ```sh
-# En GasVolcanAuth/ms-auth
-docker build -f /ruta/GasVolcanBackend/deploy/Dockerfile --build-arg JAR=target/ms-auth-0.0.1-SNAPSHOT.jar -t ms-auth .
-# En GasVolcanBackend/ms-negocio
-docker build -f ../deploy/Dockerfile --build-arg JAR=target/ms-negocio-0.0.1-SNAPSHOT.jar -t ms-negocio .
+docker build -f /ruta/GasVolcanBackend/deploy/Dockerfile --build-arg JAR=target/ms-pedidos-0.0.1-SNAPSHOT.jar -t ms-pedidos .
 ```
 
-Para mantener las bases y Nginx en el host Linux, puedes arrancar cada imagen con `--network host`, el archivo de entorno correspondiente y `-e SERVER_ADDRESS=127.0.0.1`. Usa un solo método de arranque por puerto en la misma instancia. La opción systemd reproduce el procedimiento de la Guía 18.
+En una instancia Linux con Nginx y MySQL en el host, la ejecución con `--network host` permite usar los puertos locales de la tabla. Aplicar los archivos de entorno y `SERVER_ADDRESS=127.0.0.1` antes de arrancar. Usa un método de arranque por servicio en cada puerto.

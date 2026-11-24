@@ -1,0 +1,16 @@
+[Unit]
+Description=Gas El Volcan ms-productos
+After=network.target ms-categorias.service
+
+[Service]
+User=gasvolcan
+Environment=SERVER_ADDRESS=127.0.0.1
+Environment=SERVER_FORWARD_HEADERS_STRATEGY=framework
+Environment=PORT=8083
+EnvironmentFile=/etc/gasvolcan/ms-productos.env
+ExecStart=/usr/bin/java -jar /opt/ms-productos/app.jar
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

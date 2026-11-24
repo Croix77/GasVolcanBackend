@@ -5,6 +5,8 @@ After=network.target
 [Service]
 User=gasvolcan
 Environment=SERVER_ADDRESS=127.0.0.1
+Environment=SERVER_FORWARD_HEADERS_STRATEGY=framework
+Environment=AUTH_PORT=8081
 EnvironmentFile=/etc/gasvolcan/ms-auth.env
 ExecStart=/usr/bin/java -jar /opt/ms-auth/app.jar
 Restart=on-failure

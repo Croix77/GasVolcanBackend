@@ -1,21 +1,29 @@
 # Gas El Volcán · Backend
 
-El proyecto tiene dos microservicios Spring Boot. Cada uno tiene su propia carpeta Maven, puerto y base MySQL.
+Gas El Volcán usa cinco microservicios Spring Boot. Cada servicio inicia por separado. React consume las rutas públicas con un JWT emitido por Auth.
 
-| Microservicio | Responsabilidad | Carpeta |
+| Servicio | Responsabilidad | Puerto local |
 | --- | --- | --- |
-| `ms-negocio` | Categorías, productos, stock, pedidos y despacho | [Abrir `ms-negocio/`](ms-negocio/) |
-| `ms-auth` | Login, JWT, usuarios y roles | [Abrir `ms-auth/` en el repositorio de Auth](https://github.com/Croix77/GasVolcanAuth/tree/feat/ms-auth-parcial-3/ms-auth) |
+| [ms-auth](https://github.com/Croix77/GasVolcanAuth/tree/main/ms-auth) | Cuentas, login, renovación del JWT y roles | 8081 |
+| [ms-categorias](ms-categorias/) | Categorías y control de referencias del catálogo | 8082 |
+| [ms-productos](ms-productos/) | Fichas, precios y ofertas | 8083 |
+| [ms-pedidos](ms-pedidos/) | Carrito confirmado, historial, existencias y pago en efectivo | 8084 |
+| [ms-despacho](ms-despacho/) | Asignación y ubicación de repartidores, estado de entrega | 8085 |
 
-Este repositorio contiene `ms-negocio/` y la configuración compartida de [despliegue](deploy/despliegue-ec2.md). El [frontend React](https://github.com/Croix77/GasvolcanReact/tree/feat/integracion-parcial-3) está en su repositorio.
+[Frontend React](https://github.com/Croix77/GasvolcanReact) · [Configurar entornos y EC2](deploy/despliegue-ec2.md) · [Migrar los datos de ms-negocio](deploy/migracion.md)
 
-## Abrir y verificar negocio
+## Cómo funciona la compra
 
-Abre `ms-negocio/` en el editor. La raíz Maven de este servicio es esa carpeta y contiene `pom.xml`, `src/` y `mvnw.cmd`.
+React consulta el precio en Productos y el stock en Pedidos. Envía los ítems con el precio mostrado y una referencia UUID. Pedidos verifica el precio vigente por REST y, en una transacción MySQL, guarda el pedido y descuenta las existencias. Devuelve la compra anterior si la confirmación se reintenta con la misma referencia. El pedido conserva el total y las líneas de la compra al momento de confirmarla.
+
+Despacho consulta a Auth antes de asignar un repartidor. Envía los cambios de estado por una ruta interna de Pedidos. La entrega registra el pago en efectivo dentro del mismo pedido.
+
+## Verificar
+
+Ejecuta Java 17 y Maven Wrapper desde cada carpeta. En Windows:
 
 ```powershell
-cd ms-negocio
 .\mvnw.cmd verify
 ```
 
-Para conectar MySQL y arrancar el servidor en local, sigue el [README de ms-negocio](ms-negocio/README.md).
+[Prueba integrada](deploy/verificar-integracion.ps1) levanta los cinco procesos y usa bases MySQL aisladas. Verifica roles, CRUD, precios, la última unidad, reintentos, caída de catálogo y despacho. El parámetro opcional `-LegacyJar` prueba la migración desde el JAR de `ms-negocio`. Mantén los archivos de entorno reales y los artefactos de compilación fuera de Git.
