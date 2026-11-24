@@ -1,6 +1,6 @@
 # Gas El Volcán · ms-auth
 
-Microservicio Spring Boot que valida las credenciales, emite JWT firmados con HS256 y administra las cuentas. Usa una base MySQL propia. Los otros cuatro microservicios validan el JWT con el mismo emisor y la misma clave Base64.
+Microservicio Spring Boot que valida las credenciales, emite JWT firmados con HS256 y administra las cuentas. Usa una base MySQL propia. Los demás microservicios validan el JWT con el mismo emisor y la misma clave Base64.
 
 ## Preparación local
 
@@ -17,7 +17,7 @@ $env:AUTH_DB_PASSWORD = [System.Net.NetworkCredential]::new("", $claveDb).Passwo
 .\mvnw.cmd spring-boot:run
 ```
 
-Genera la clave JWT una vez por entorno y usa el mismo valor en los cinco servicios. Auth escucha en `http://localhost:8081`; en local, Swagger abre en `http://localhost:8081/swagger-ui/index.html`.
+Genera la clave JWT una vez por entorno y usa el mismo valor en todos los servicios. Auth escucha en `http://localhost:8081`; en local, Swagger abre en `http://localhost:8081/swagger-ui/index.html`.
 
 ## Primer usuario
 

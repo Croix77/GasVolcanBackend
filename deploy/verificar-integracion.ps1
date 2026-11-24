@@ -15,7 +15,7 @@ $java = (Resolve-Path -LiteralPath $Java).Path
 $mysqlHome = (Resolve-Path -LiteralPath $MysqlHome).Path
 $mysqlServer = Join-Path $mysqlHome 'bin/mysqld.exe'
 $jars = @{}
-foreach ($nombre in 'ms-categorias','ms-productos','ms-pedidos','ms-despacho') {
+foreach ($nombre in 'ms-categorias','ms-productos','ms-pedidos','ms-despacho','ms-contacto') {
     $jars[$nombre] = (Resolve-Path (Join-Path $directorio "$nombre/target/$nombre-0.0.1-SNAPSHOT.jar")).Path
 }
 $temp = Join-Path ([IO.Path]::GetTempPath()) ('gas-volcan-ensayo-' + [guid]::NewGuid().ToString('N'))
@@ -58,7 +58,10 @@ function Abrir-Proceso([string]$ejecutable, [string[]]$argumentos, [string]$nomb
     return $proceso
 }
 function Abrir-Jar([string]$jar, [string]$nombre, [hashtable]$variables) {
-    Abrir-Proceso $java @('-Xms32m','-Xmx320m','-jar',('"' + $jar + '"'),'--server.address=127.0.0.1') $nombre $variables
+    # Se prueba una copia estable. Maven puede volver a compilar el proyecto sin afectar el proceso.
+    $copia = Join-Path $temp "$nombre.jar"
+    Copy-Item -LiteralPath $jar -Destination $copia
+    Abrir-Proceso $java @('-Xms32m','-Xmx320m','-jar',('"' + $copia + '"'),'--server.address=127.0.0.1') $nombre $variables
 }
 function Nueva-Peticion([string]$metodo, [string]$url, [string]$token, [object]$body) {
     $r = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::new($metodo), $url)
@@ -107,6 +110,7 @@ try {
     $productosPort = Puerto-Libre
     $pedidosPort = Puerto-Libre
     $despachoPort = Puerto-Libre
+    $contactoPort = Puerto-Libre
     $legacyPort = Puerto-Libre
     $authBase = "http://127.0.0.1:$authPort"
     $categoriasBase = "http://127.0.0.1:$categoriasPort"
@@ -119,6 +123,7 @@ try {
     $categoriasDbClave = Nueva-Clave
     $productosDbClave = Nueva-Clave
     $pedidosDbClave = Nueva-Clave
+    $contactoDbClave = Nueva-Clave
     $adminClave = Nueva-Clave
     $clienteClave = Nueva-Clave
     $adminCorreo = 'admin@example.test'
@@ -133,15 +138,18 @@ CREATE DATABASE gas_volcan_auth CHARACTER SET utf8mb4;
 CREATE DATABASE gas_volcan_categorias CHARACTER SET utf8mb4;
 CREATE DATABASE gas_volcan_productos CHARACTER SET utf8mb4;
 CREATE DATABASE gas_volcan_pedidos CHARACTER SET utf8mb4;
+CREATE DATABASE gas_volcan_contacto CHARACTER SET utf8mb4;
 CREATE DATABASE gas_volcan_negocio CHARACTER SET utf8mb4;
 CREATE USER 'auth_ensayo'@'127.0.0.1' IDENTIFIED BY '$authDbClave';
 CREATE USER 'categorias_ensayo'@'127.0.0.1' IDENTIFIED BY '$categoriasDbClave';
 CREATE USER 'productos_ensayo'@'127.0.0.1' IDENTIFIED BY '$productosDbClave';
 CREATE USER 'pedidos_ensayo'@'127.0.0.1' IDENTIFIED BY '$pedidosDbClave';
+CREATE USER 'contacto_ensayo'@'127.0.0.1' IDENTIFIED BY '$contactoDbClave';
 GRANT ALL PRIVILEGES ON gas_volcan_auth.* TO 'auth_ensayo'@'127.0.0.1';
 GRANT ALL PRIVILEGES ON gas_volcan_categorias.* TO 'categorias_ensayo'@'127.0.0.1';
 GRANT ALL PRIVILEGES ON gas_volcan_productos.* TO 'productos_ensayo'@'127.0.0.1';
 GRANT ALL PRIVILEGES ON gas_volcan_pedidos.* TO 'pedidos_ensayo'@'127.0.0.1';
+GRANT ALL PRIVILEGES ON gas_volcan_contacto.* TO 'contacto_ensayo'@'127.0.0.1';
 CREATE USER 'legacy_ensayo'@'127.0.0.1' IDENTIFIED BY '$legacyDbClave';
 GRANT ALL PRIVILEGES ON gas_volcan_negocio.* TO 'legacy_ensayo'@'127.0.0.1';
 ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
@@ -174,11 +182,17 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
         PORT="$despachoPort"; JWT_SECRET=$jwt; PEDIDOS_URL=$pedidoBase; AUTH_URL=$authBase
     }
 
+    $contacto = Abrir-Jar $jars['ms-contacto'] 'contacto' @{
+        PORT="$contactoPort"; JWT_SECRET=$jwt
+        DB_URL="$jdbc/gas_volcan_contacto?$opcionesJdbc"; DB_USER='contacto_ensayo'; DB_PASSWORD=$contactoDbClave
+    }
+
     Esperar-Puerto $authPort $auth 'ms-auth'
     Esperar-Puerto $categoriasPort $categorias 'ms-categorias'
     Esperar-Puerto $productosPort $productos 'ms-productos'
     Esperar-Puerto $pedidosPort $pedidos 'ms-pedidos'
     Esperar-Puerto $despachoPort $reparto 'ms-despacho'
+    Esperar-Puerto $contactoPort $contacto 'ms-contacto'
     Start-Sleep -Seconds 2
     Remove-Item -LiteralPath $initSql -ErrorAction SilentlyContinue
 
@@ -186,7 +200,7 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
     $admin = (Llamar 'POST' $login 200 '' @{correo=$adminCorreo;password=$adminClave}).token
     $tokens = @{}
     $cuentasIds = @{}
-    $cuentas = @{clienteA='CLIENTE';clienteB='CLIENTE';operadora='OPERADORA';repartidorA='REPARTIDOR';repartidorB='REPARTIDOR'}
+    $cuentas = @{clienteA='CLIENTE';clienteB='CLIENTE';vendedor='VENDEDOR';operadora='OPERADORA';repartidorA='REPARTIDOR';repartidorB='REPARTIDOR'}
     foreach ($alias in $cuentas.Keys) {
         $correo = "$($alias.ToLowerInvariant())@example.test"
         $creada = Llamar 'POST' "$authBase/api/auth/usuarios" 201 $admin @{
@@ -253,7 +267,7 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
     $null = Llamar 'GET' $despacho 403 $tokens.clienteA
     $categoria = Llamar 'GET' "$categoriasBase/api/v1/categorias/1" 200 $tokens.clienteA
     $ficha = Llamar 'GET' $rutaProducto 200 $tokens.clienteA
-    Probar ($categoria.id -eq 1 -and $ficha.precio -eq 5900) 'Cinco servicios arrancan y respetan permisos JWT'
+    Probar ($categoria.id -eq 1 -and $ficha.precio -eq 5900) 'Seis servicios arrancan y respetan permisos JWT'
 
     $categoriasRuta = "$categoriasBase/api/v1/categorias"
     $productosRuta = "$productoBase/api/v1/productos"
@@ -338,6 +352,26 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
     $null = Llamar 'PATCH' "$authBase/api/auth/usuarios/$($cuentasIds['repartidorB'])/estado" 200 $admin @{activo=$false}
     $null = Llamar 'PATCH' "$despacho/$otroId/estado" 401 $tokens.repartidorB @{estado='EN_CAMINO'}
     Probar ((Llamar 'GET' "$rutaPedido/$otroId" 200 $tokens.clienteA).estado -eq 'ASIGNADO') 'Un repartidor desactivado no modifica su entrega aunque conserve el JWT'
+    $contactoRuta = "http://127.0.0.1:$contactoPort/api/v1/contacto/mensajes"
+    $consulta = @{
+        nombre='Ana María'; mensaje='¿Hay reparto en Chillán para un cilindro de 11 kg?'
+        referencia=[guid]::NewGuid().ToString()
+    }
+    $null = Llamar 'POST' $contactoRuta 401 '' $consulta
+    $null = Llamar 'POST' $contactoRuta 403 $tokens.vendedor $consulta
+    $null = Llamar 'GET' $contactoRuta 403 $tokens.clienteA
+    $null = Llamar 'GET' $contactoRuta 403 $tokens.operadora
+    $null = Llamar 'GET' "$($contactoRuta)?pagina=-1" 400 $admin
+    $null = Llamar 'POST' $contactoRuta 400 $tokens.clienteA @{nombre='123';mensaje='   corto  ';referencia=[guid]::NewGuid().ToString()}
+    $nueva = $consulta.Clone()
+    $nueva.correo = 'otra-cuenta@example.test'
+    $null = Llamar 'POST' $contactoRuta 400 $tokens.clienteA $nueva
+    $reintento = Concurrencia $contactoRuta $tokens.clienteA $consulta $tokens.clienteA $consulta
+    $bandeja = Llamar 'GET' $contactoRuta 200 $admin
+    Probar ((($reintento.Estado | Sort-Object) -join ',') -eq '200,201' -and $reintento[0].Datos.id -eq $reintento[1].Datos.id) 'Contacto guarda un único mensaje si el cliente reintenta al mismo tiempo'
+    Probar ($bandeja.mensajes.Count -eq 1 -and $bandeja.mensajes[0].nombre -eq $consulta.nombre -and
+        $bandeja.mensajes[0].mensaje -eq $consulta.mensaje -and $bandeja.mensajes[0].correo -eq 'clientea@example.test') 'Contacto valida datos y roles y usa el correo verificado de la sesión'
+
     if ($Frontend) {
         if (!$Nginx -or !$Edge) { throw 'Pasa -Nginx y -Edge para comprobar React compilado en navegador.' }
         $frontPath = (Resolve-Path (Join-Path $Frontend 'dist')).Path.Replace('\','/')
@@ -352,7 +386,7 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
 
         $config = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'gasvolcan.conf') -Raw)
         $config = $config.Replace('listen 80;', "listen 127.0.0.1:$webPort;").Replace('root /var/www/gasvolcan;', "root '$frontPath';")
-        foreach ($par in @(@(8081,$authPort),@(8082,$categoriasPort),@(8083,$productosPort),@(8084,$pedidosPort),@(8085,$despachoPort))) {
+        foreach ($par in @(@(8081,$authPort),@(8082,$categoriasPort),@(8083,$productosPort),@(8084,$pedidosPort),@(8085,$despachoPort),@(8086,$contactoPort))) {
             $config = $config.Replace("proxy_pass http://127.0.0.1:$($par[0]);", "proxy_pass http://127.0.0.1:$($par[1]);")
         }
         $prefijo = @"
@@ -378,13 +412,14 @@ http {
         $null = Llamar 'GET' "$origen/api/v1/productos" 200 $tokens.clienteA
         $null = Llamar 'GET' "$origen/api/v1/stock" 200 $tokens.clienteA
         $null = Llamar 'GET' "$origen/api/v1/despacho" 200 $tokens.operadora
+        $null = Llamar 'GET' "$origen/api/v1/contacto/mensajes" 200 $admin
         $privada = Invoke-WebRequest -Uri "$origen/api/v1/interno/pedidos/$($ganador.id)/estado" -SkipHttpErrorCheck -TimeoutSec 10
         Probar ($privada.StatusCode -eq 404) 'Nginx dirige las rutas públicas y oculta las rutas internas'
 
         $edgeDir = Join-Path $temp 'edge'
         $navegador = Abrir-Proceso $edgePath @('--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check',"--remote-debugging-port=$cdp",('--user-data-dir="' + $edgeDir + '"'),'about:blank') 'edge'
         Esperar-Puerto $cdp $navegador 'Edge de prueba'
-        $browser = Abrir-Proceso $nodePath @(('"' + (Join-Path $PSScriptRoot 'verificar-navegador.mjs') + '"'),$origen,"$cdp") 'browser' @{SMOKE_CLIENT_PASSWORD=$clienteClave}
+        $browser = Abrir-Proceso $nodePath @(('"' + (Join-Path $PSScriptRoot 'verificar-navegador.mjs') + '"'),$origen,"$cdp") 'browser' @{SMOKE_CLIENT_PASSWORD=$clienteClave;SMOKE_ADMIN_EMAIL=$adminCorreo;SMOKE_ADMIN_PASSWORD=$adminClave}
         if (!$browser.WaitForExit(78000) -or $browser.ExitCode -ne 0) {
             Get-Content -LiteralPath (Join-Path $temp 'browser.err')
             throw 'El recorrido de React en navegador falló.'

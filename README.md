@@ -1,6 +1,6 @@
 # Gas El Volcán · Backend
 
-Este repositorio contiene los cinco microservicios Spring Boot de Gas El Volcán. Ejecuta cada servicio desde su propia carpeta. React consume las rutas públicas con un JWT emitido por Auth.
+Este repositorio contiene seis microservicios Spring Boot de Gas El Volcán. Ejecuta cada servicio desde su propia carpeta. React consume las rutas públicas con un JWT emitido por Auth.
 
 | Servicio | Responsabilidad | Puerto local |
 | --- | --- | --- |
@@ -9,6 +9,7 @@ Este repositorio contiene los cinco microservicios Spring Boot de Gas El Volcán
 | [ms-productos](ms-productos/) | Fichas, precios y ofertas | 8083 |
 | [ms-pedidos](ms-pedidos/) | Carrito confirmado, historial, existencias y pago en efectivo | 8084 |
 | [ms-despacho](ms-despacho/) | Asignación y ubicación de repartidores, estado de entrega | 8085 |
+| [ms-contacto](ms-contacto/) | Consultas de clientes y bandeja administrativa | 8086 |
 
 [Frontend React](https://github.com/Croix77/GasvolcanReact) · [Configurar entornos y EC2](deploy/despliegue-ec2.md) · [Migrar los datos de ms-negocio](deploy/migracion.md)
 
@@ -26,4 +27,4 @@ Ejecuta Java 17 y Maven Wrapper desde cada carpeta. En Windows:
 .\mvnw.cmd verify
 ```
 
-[Prueba integrada](deploy/verificar-integracion.ps1) levanta los cinco procesos y usa bases MySQL aisladas. Verifica roles, CRUD, precios, la última unidad, reintentos, caída de catálogo y despacho. El script usa el JAR compilado en `ms-auth/target/`. El parámetro opcional `-LegacyJar` prueba la migración desde el JAR de `ms-negocio`. Pasa `-Frontend`, `-Nginx` y `-Edge` para comprobar además el sitio compilado en el navegador. Mantén los archivos de entorno reales y los artefactos de compilación fuera de Git.
+[Prueba integrada](deploy/verificar-integracion.ps1) levanta los seis procesos y usa bases MySQL aisladas. Verifica roles, CRUD, precios, la última unidad, reintentos, caída de catálogo, despacho y contacto. El script usa el JAR compilado en `ms-auth/target/`. El parámetro opcional `-LegacyJar` prueba la migración desde el JAR de `ms-negocio`. Pasa `-Frontend`, `-Nginx` y `-Edge` para comprobar además el sitio compilado en el navegador. Mantén los archivos de entorno reales y los artefactos de compilación fuera de Git.

@@ -51,7 +51,8 @@ async function until(description, fn, ...args) {
 function setField(name, value) {
   const el = document.querySelector("[name=\"" + name + "\"]");
   if (!el) return false;
-  const proto = el.tagName === "SELECT" ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+  const proto = el.tagName === "SELECT" ? HTMLSelectElement.prototype
+    : el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   Object.getOwnPropertyDescriptor(proto, "value").set.call(el, value);
   el.dispatchEvent(new Event(el.tagName === "SELECT" ? "change" : "input", { bubbles: true }));
   return el.value === value;
@@ -118,6 +119,39 @@ try {
   assert(opened);
   await until("mapa de seguimiento del pedido persistido", () => document.querySelectorAll(".leaflet-marker-icon").length >= 1);
   console.log("OK: React compra real, historial persistido y punto de entrega en Leaflet");
+
+  await command("Page.navigate", { url: origen + "/contacto" });
+  await until("formulario de contacto del cliente", () =>
+    document.querySelector("h1")?.textContent === "Contacto" && !!document.querySelector("textarea[name=mensaje]"));
+  assert(await run(() => document.querySelector("input[name=correo]")?.readOnly &&
+    document.querySelector("input[name=correo]").value === "clientea@example.test"));
+  const mensajeContacto = "¿Hacen despacho en Chillán Viejo? Consulta enviada desde el navegador.";
+  assert(await run(setField, "nombre", "María del Ensayo"));
+  assert(await run(setField, "mensaje", mensajeContacto));
+  assert(await run(() => {
+    const enviar = [...document.querySelectorAll("button")].find((boton) => boton.textContent.trim() === "Enviar consulta");
+    if (!enviar || enviar.disabled) return false;
+    enviar.click();
+    return true;
+  }));
+  await until("confirmación de consulta recibida", () => document.body.textContent.includes("Recibimos tu consulta."));
+
+  assert(await run(() => {
+    const salir = [...document.querySelectorAll("button")].find((boton) => boton.textContent.trim() === "Cerrar sesión");
+    salir?.click();
+    return !!salir;
+  }));
+  await until("salida de la sesión del cliente", () => location.pathname === "/login");
+  await command("Page.navigate", { url: origen + "/admin/contacto" });
+  await until("login de acceso a la bandeja", () => location.pathname === "/login" &&
+    document.querySelector("h1")?.textContent.includes("Iniciar sesión"));
+  assert(await run(setField, "correo", process.env.SMOKE_ADMIN_EMAIL));
+  assert(await run(setField, "clave", process.env.SMOKE_ADMIN_PASSWORD));
+  assert(await run(() => { document.querySelector("button[type=submit]").click(); return true; }));
+  await until("bandeja administrativa muestra mensaje persistido", (texto) =>
+    document.querySelector("h1")?.textContent.includes("Consultas de contacto") &&
+    document.body.textContent.includes(texto) && document.body.textContent.includes("clientea@example.test"), mensajeContacto);
+  console.log("OK: React envía contacto y la bandeja administrativa carga el mensaje guardado");
 } finally {
   ws.close();
 }

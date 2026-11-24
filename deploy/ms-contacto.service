@@ -1,0 +1,16 @@
+[Unit]
+Description=Gas El Volcan ms-contacto
+After=network.target
+
+[Service]
+User=gasvolcan
+Environment=SERVER_ADDRESS=127.0.0.1
+Environment=SERVER_FORWARD_HEADERS_STRATEGY=framework
+Environment=PORT=8086
+EnvironmentFile=/etc/gasvolcan/ms-contacto.env
+ExecStart=/usr/bin/java -jar /opt/ms-contacto/app.jar
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
