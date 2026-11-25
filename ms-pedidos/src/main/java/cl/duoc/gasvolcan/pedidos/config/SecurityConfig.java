@@ -1,4 +1,4 @@
-package cl.duoc.gasvolcan.pedidos.config;
+﻿package cl.duoc.gasvolcan.pedidos.config;
 
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
@@ -30,13 +30,12 @@ public class SecurityConfig {
     SecurityFilterChain apiSecurity(HttpSecurity http, JwtAuthenticationConverter converter) throws Exception {
         AuthenticationEntryPoint sinSesion = (request, response, error) -> {
             response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
-            responderError(response, HttpServletResponse.SC_UNAUTHORIZED, "Token de acceso válido requerido.");
+            responderError(response, HttpServletResponse.SC_UNAUTHORIZED, "Token de acceso vǭlido requerido.");
         };
         AccessDeniedHandler sinPermiso = (request, response, error) ->
-                responderError(response, HttpServletResponse.SC_FORBIDDEN, "No tienes permiso para esta operación.");
+                responderError(response, HttpServletResponse.SC_FORBIDDEN, "No tienes permiso para esta operaci��n.");
 
         return http
-                // Cada solicitud trae el token Bearer en su cabecera y se autentica de forma independiente.
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .cors(Customizer.withDefaults())
@@ -49,8 +48,7 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/swagger-ui.html", "/swagger-ui/**",
                                 "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/stock", "/api/v1/stock/*", "/api/v1/zonas")
-                                .hasAnyRole("ADMIN", "VENDEDOR", "CLIENTE")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/stock", "/api/v1/stock/*", "/api/v1/zonas").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/pedidos", "/api/v1/pedidos/*")
                                 .hasAnyRole("ADMIN", "VENDEDOR", "CLIENTE", "OPERADORA", "REPARTIDOR")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/stock/*").hasRole("ADMIN")

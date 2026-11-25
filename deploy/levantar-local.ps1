@@ -58,8 +58,13 @@ foreach ($modulo in $modulos) {
     $jars[$modulo] = $jar
     if ($ForzarBuild -or -not (Test-Path -LiteralPath $jar)) {
         $mvnw = Join-Path $backend "$modulo\mvnw.cmd"
-        & $mvnw -q -DskipTests package
-        if ($LASTEXITCODE -ne 0) { throw "Falló la compilación de $modulo" }
+        Push-Location -LiteralPath (Join-Path $backend $modulo)
+        try {
+            & $mvnw -q -DskipTests package
+            if ($LASTEXITCODE -ne 0) { throw "Falló la compilación de $modulo" }
+        } finally {
+            Pop-Location
+        }
     }
 }
 

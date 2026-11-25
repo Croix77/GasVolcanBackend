@@ -1,4 +1,4 @@
-package cl.duoc.gasvolcan.categorias.config;
+﻿package cl.duoc.gasvolcan.categorias.config;
 
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
@@ -38,10 +38,10 @@ public class SeguridadApi {
         byte[] token = tokenInterno.getBytes(StandardCharsets.UTF_8);
         AuthenticationEntryPoint sinSesion = (request, response, error) -> {
             response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
-            enviarError(response, HttpServletResponse.SC_UNAUTHORIZED, "Token de acceso válido requerido.");
+            enviarError(response, HttpServletResponse.SC_UNAUTHORIZED, "Token de acceso vǭlido requerido.");
         };
         AccessDeniedHandler sinPermiso = (request, response, error) ->
-                enviarError(response, HttpServletResponse.SC_FORBIDDEN, "No tienes permiso para esta operación.");
+                enviarError(response, HttpServletResponse.SC_FORBIDDEN, "No tienes permiso para esta operaci��n.");
 
         return http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -61,8 +61,7 @@ public class SeguridadApi {
                             boolean valida = valor != null && MessageDigest.isEqual(token, valor.getBytes(StandardCharsets.UTF_8));
                             return new AuthorizationDecision(valida);
                         })
-                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias", "/api/v1/categorias/*")
-                        .hasAnyRole("ADMIN", "VENDEDOR", "CLIENTE")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias", "/api/v1/categorias/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/categorias").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/categorias/*").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/categorias/*").hasRole("ADMIN")

@@ -1,4 +1,4 @@
-package cl.duoc.gasvolcan.productos.config;
+﻿package cl.duoc.gasvolcan.productos.config;
 
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
@@ -31,10 +31,10 @@ public class SeguridadApi {
             HttpSecurity http, JwtAuthenticationConverter permisosJwt) throws Exception {
         AuthenticationEntryPoint sinSesion = (request, response, error) -> {
             response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
-            enviarError(response, HttpServletResponse.SC_UNAUTHORIZED, "Token de acceso válido requerido.");
+            enviarError(response, HttpServletResponse.SC_UNAUTHORIZED, "Token de acceso vǭlido requerido.");
         };
         AccessDeniedHandler sinPermiso = (request, response, error) ->
-                enviarError(response, HttpServletResponse.SC_FORBIDDEN, "No tienes permiso para esta operación.");
+                enviarError(response, HttpServletResponse.SC_FORBIDDEN, "No tienes permiso para esta operaci��n.");
 
         return http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -48,8 +48,7 @@ public class SeguridadApi {
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/swagger-ui.html", "/swagger-ui/**",
                                 "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/productos", "/api/v1/productos/*", "/api/v1/productos/*/precio")
-                        .hasAnyRole("ADMIN", "VENDEDOR", "CLIENTE")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/productos", "/api/v1/productos/*", "/api/v1/productos/*/precio").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/productos").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/productos/*", "/api/v1/productos/*/precio").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/productos/*").hasRole("ADMIN")
