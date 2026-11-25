@@ -10,7 +10,8 @@ Microservicio Spring Boot que valida las credenciales, emite JWT firmados con HS
 
 ```powershell
 $bytes = New-Object byte[] 32
-[Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
 $env:JWT_SECRET = [Convert]::ToBase64String($bytes)
 $claveDb = Read-Host "Contraseña MySQL de Auth" -AsSecureString
 $env:AUTH_DB_PASSWORD = [System.Net.NetworkCredential]::new("", $claveDb).Password
@@ -18,6 +19,8 @@ $env:AUTH_DB_PASSWORD = [System.Net.NetworkCredential]::new("", $claveDb).Passwo
 ```
 
 Genera la clave JWT una vez por entorno y usa el mismo valor en todos los servicios. Auth escucha en `http://localhost:8081`; en local, Swagger abre en `http://localhost:8081/swagger-ui/index.html`.
+
+Para un ensayo completo y reproducible, desde la raíz del backend ejecuta `./deploy/levantar-local.ps1`. El script crea un MySQL descartable con los cinco esquemas, genera secretos nuevos, levanta los seis servicios, siembra catálogo y stock, crea las cinco cuentas de la demo y abre React en `http://127.0.0.1:5173`. Las claves web quedan en `deploy/.local/credenciales.txt`; los secretos y el directorio de datos están excluidos de Git. Usa `./deploy/estado-local.ps1` para comprobar puertos y logins, y `./deploy/detener-local.ps1` para apagar el ensayo.
 
 ## Primer usuario
 
@@ -48,8 +51,8 @@ Si usas una base de una versión anterior, el perfil local con `AUTH_DB_DDL_AUTO
 | `AUTH_DB_DDL_AUTO` | `update` local, `validate` en el perfil `prod` |
 | `JWT_SECRET` | Requerida. Base64 de al menos 32 bytes |
 | `JWT_ISSUER` | `gasvolcan-auth` |
-| `AUTH_JWT_EXPIRATION_MS` | `3600000` (1 hora) |
-| `AUTH_JWT_REFRESH_WINDOW_MS` | `300000` (5 minutos) |
+| `AUTH_JWT_EXPIRATION_MS` | `300000` (5 minutos) |
+| `AUTH_JWT_REFRESH_WINDOW_MS` | `90000` (90 segundos) |
 | `APP_CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` en local, vacío con `prod` |
 | `SWAGGER_ENABLED` | `true` local, `false` con `prod` |
 

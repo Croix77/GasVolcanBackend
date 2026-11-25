@@ -34,6 +34,16 @@ React consulta el precio en Productos y el stock en Pedidos. Envía los ítems c
 
 Despacho consulta a Auth antes de asignar un repartidor. Envía los cambios de estado por una ruta interna de Pedidos. La entrega registra el pago en efectivo dentro del mismo pedido.
 
+## Ensayo local
+
+Desde la raíz del backend, en Windows con Java 17, MySQL/MariaDB, Node y PowerShell:
+
+```powershell
+./deploy/levantar-local.ps1
+```
+
+El script crea un MySQL local descartable con los cinco esquemas (`gas_volcan_auth`, `gas_volcan_categorias`, `gas_volcan_productos`, `gas_volcan_pedidos` y `gas_volcan_contacto`), genera secretos nuevos, levanta los seis JAR y React, siembra catálogo y stock, y crea las cinco cuentas de la demo. Las claves web quedan en `deploy/.local/credenciales.txt`; los secretos y los datos no se versionan. Comprueba el estado con `./deploy/estado-local.ps1` y apaga todo con `./deploy/detener-local.ps1`. Pasa `-Frontend` si React no está en la carpeta hermana, `-SkipFrontend` para levantar solo backend, o `-MysqlHome` si MySQL no está en la ruta habitual.
+
 ## Verificar
 
 Ejecuta Java 17 y Maven Wrapper desde cada carpeta. En Windows:
