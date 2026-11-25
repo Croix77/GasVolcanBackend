@@ -263,6 +263,10 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
     $stock5 = "$pedidoBase/api/v1/stock/gas-5kg"
     $stock15 = "$pedidoBase/api/v1/stock/gas-15kg"
     $null = Llamar 'GET' $rutaProducto 401
+    $null = Llamar 'GET' "$categoriasBase/api/v1/categorias" 401
+    $null = Llamar 'GET' "$rutaProducto/precio" 401
+    $null = Llamar 'GET' $stock5 401
+    $null = Llamar 'GET' "$pedidoBase/api/v1/zonas" 401
     $null = Llamar 'GET' $rutaPedido 401
     $null = Llamar 'GET' $despacho 401
     $null = Llamar 'GET' $despacho 403 $tokens.clienteA
