@@ -13,6 +13,21 @@ Este repositorio contiene seis microservicios Spring Boot de Gas El Volcán. Eje
 
 [Frontend React](https://github.com/Croix77/GasvolcanReact) · [Configurar entornos y EC2](deploy/despliegue-ec2.md) · [Migrar los datos de ms-negocio](deploy/migracion.md)
 
+## Organización del código Java
+
+Cada servicio conserva su clase de arranque en el paquete principal. Las clases se agrupan por responsabilidad.
+
+- controller recibe las solicitudes HTTP.
+- service aplica las reglas del negocio.
+- repository accede a la base de datos.
+- model representa las entidades guardadas.
+- dto define datos de entrada y salida cuando se declaran como clases propias.
+- config y security configuran Spring, permisos y JWT.
+- exception convierte errores en respuestas de la API.
+- client realiza llamadas REST a otros servicios.
+
+Cada módulo contiene los paquetes que necesita. Las pruebas HTTP se encuentran en src/test/java.
+
 ## Cómo funciona la compra
 
 React consulta el precio en Productos y el stock en Pedidos. Envía los ítems con el precio mostrado y una referencia UUID. Pedidos verifica el precio vigente por REST y, en una transacción MySQL, guarda el pedido y descuenta las existencias. Devuelve la compra anterior si la confirmación se reintenta con la misma referencia. El pedido conserva el total y las líneas de la compra al momento de confirmarla.

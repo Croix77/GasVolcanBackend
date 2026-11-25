@@ -1,5 +1,8 @@
 package cl.duoc.gasvolcan.contacto;
 
+import cl.duoc.gasvolcan.contacto.model.MensajeContacto;
+import cl.duoc.gasvolcan.contacto.repository.MensajeContactoRepository;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URI;

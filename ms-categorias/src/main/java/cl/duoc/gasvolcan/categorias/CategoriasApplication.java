@@ -1,5 +1,8 @@
 package cl.duoc.gasvolcan.categorias;
 
+import cl.duoc.gasvolcan.categorias.model.Categoria;
+import cl.duoc.gasvolcan.categorias.repository.CategoriaRepository;
+
 import java.util.List;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
