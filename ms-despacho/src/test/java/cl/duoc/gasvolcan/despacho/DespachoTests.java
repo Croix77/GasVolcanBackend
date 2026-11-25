@@ -85,6 +85,22 @@ class DespachoTests {
         assertThat(LLAMADAS_PEDIDOS.get()).isEqualTo(1);
     }
 
+    @Test
+    void publicaDocumentacionYRechazaRolNoAutorizado() throws Exception {
+        var documentacion = leer("/v3/api-docs");
+        assertThat(documentacion.statusCode()).isEqualTo(200);
+        assertThat(documentacion.body()).contains("\"paths\"");
+        assertThat(escribir(ESTADO, "CLIENTE", "{\"estado\":\"ENTREGADO\"}").statusCode()).isEqualTo(403);
+        assertThat(LLAMADAS_PEDIDOS.get()).isZero();
+    }
+
+    private HttpResponse<String> leer(String ruta) throws Exception {
+        var solicitud = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + puerto + ruta))
+                .GET()
+                .build();
+        return http.send(solicitud, HttpResponse.BodyHandlers.ofString());
+    }
+
     private HttpResponse<String> escribir(String ruta, String rol, String datos) throws Exception {
         var solicitud = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + puerto + ruta))
                 .method("PATCH", HttpRequest.BodyPublishers.ofString(datos))

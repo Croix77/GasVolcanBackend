@@ -42,7 +42,15 @@ Desde la raíz del backend, en Windows con Java 17, MySQL/MariaDB, Node y PowerS
 ./deploy/levantar-local.ps1
 ```
 
-El script crea un MySQL local descartable con los cinco esquemas (`gas_volcan_auth`, `gas_volcan_categorias`, `gas_volcan_productos`, `gas_volcan_pedidos` y `gas_volcan_contacto`), genera secretos nuevos, levanta los seis JAR y React, siembra catálogo y stock, y crea las cinco cuentas de la demo. Las claves web quedan en `deploy/.local/credenciales.txt`; los secretos y los datos no se versionan. Comprueba el estado con `./deploy/estado-local.ps1` y apaga todo con `./deploy/detener-local.ps1`. Pasa `-Frontend` si React no está en la carpeta hermana, `-SkipFrontend` para levantar solo backend, o `-MysqlHome` si MySQL no está en la ruta habitual.
+El script crea un MySQL local descartable en el puerto 3307 con los cinco esquemas (`gas_volcan_auth`, `gas_volcan_categorias`, `gas_volcan_productos`, `gas_volcan_pedidos` y `gas_volcan_contacto`), genera secretos nuevos, levanta los seis JAR y React, siembra catálogo y stock, y crea las cinco cuentas de la demo. Las claves web quedan en `deploy/.local/credenciales.txt`; los secretos y los datos no se versionan.
+
+Para usar un MySQL ya corriendo, por ejemplo Laragon en el puerto 3306:
+
+```powershell
+./deploy/levantar-local.ps1 -MysqlExterno -MysqlPuerto 3306 -MysqlAdminUsuario root -MysqlAdminPassword '' -SkipFrontend
+```
+
+En modo externo el script no inicia ni reemplaza tu MySQL: crea los esquemas y cinco usuarios dedicados (`gv_auth`, `gv_cat`, `gv_prod`, `gv_ped`, `gv_cont`) con claves aleatorias y guarda la configuración en `deploy/.local/env.ps1`. `root` solo sirve para aprovisionar; los servicios nunca lo usan. Si `env.ps1` cambia, el arranque reinicia los servicios para que todos carguen el mismo `JWT_SECRET` y el mismo emisor. Un puerto ocupado por otro proceso produce un error, no un falso `YA ACTIVO`. `estado-local.ps1` comprueba el proceso y la respuesta HTTP de cada servicio, y valida `login` de cliente + `POST` a contacto (espera HTTP 201). Apaga todo con `./deploy/detener-local.ps1`. Pasa `-Frontend` si React no está en la carpeta hermana, `-SkipFrontend` para levantar solo backend, o `-MysqlHome` si MySQL no está en la ruta habitual.
 
 ## Verificar
 

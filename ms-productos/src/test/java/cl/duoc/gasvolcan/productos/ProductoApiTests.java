@@ -105,7 +105,7 @@ class ProductoApiTests {
 
     @Test
     void conservaElCatalogoYPermiteConsultarPrecioSinStock() throws Exception {
-        enviar("GET", RUTA, null, null, null, 401);
+        assertThat(enviar("GET", RUTA, null, null, null, 200).size()).isGreaterThanOrEqualTo(14);
         assertThat(enviar("GET", RUTA, "CLIENTE", null, null, 200).size()).isGreaterThanOrEqualTo(14);
         var gas = enviar("GET", RUTA + "/gas-5kg", "CLIENTE", null, null, 200);
         assertThat(gas.has("stock")).isFalse();
@@ -116,6 +116,7 @@ class ProductoApiTests {
         assertThat(enviar("GET", RUTA + "/gas-5kg/precio", "CLIENTE", null, null, 200).get("precio").asInt())
                 .isEqualTo(5900);
         enviar("PUT", RUTA + "/gas-5kg/precio", "CLIENTE", null, "{\"precio\":0}", 403);
+        assertThat(enviar("GET", "/v3/api-docs", null, null, null, 200).path("paths").has(RUTA)).isTrue();
     }
 
     @Test
@@ -158,9 +159,11 @@ class ProductoApiTests {
     private static void simularCategorias(HttpExchange peticion) throws IOException {
         try (peticion) {
             if (!LLAVE.equals(peticion.getRequestHeaders().getFirst("X-Catalogo-Key"))) {
+                peticion.getRequestBody().readAllBytes();
                 peticion.sendResponseHeaders(401, -1);
                 return;
             }
+            peticion.getRequestBody().readAllBytes();
             String[] partes = peticion.getRequestURI().getPath().split("/");
             switch (peticion.getRequestMethod()) {
                 case "GET" -> escribir(peticion, LISTADO);

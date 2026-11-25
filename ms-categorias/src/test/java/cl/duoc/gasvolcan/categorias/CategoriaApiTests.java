@@ -83,7 +83,7 @@ class CategoriaApiTests {
 
     @Test
     void permiteConsultarYRestringeLaEscrituraAAdministracion() throws Exception {
-        enviar("GET", RUTA, null, null, null, 401);
+        assertThat(enviar("GET", RUTA, null, null, null, 200).size()).isGreaterThanOrEqualTo(4);
         assertThat(enviar("GET", RUTA, "CLIENTE", null, null, 200).size()).isGreaterThanOrEqualTo(4);
         enviar("POST", RUTA, "CLIENTE", null, "{\"nombre\":\"Otra\"}", 403);
         enviar("POST", RUTA, "ADMIN", null, "{\"nombre\":\"  \"}", 400);

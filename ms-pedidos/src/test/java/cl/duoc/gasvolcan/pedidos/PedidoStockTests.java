@@ -168,6 +168,12 @@ class PedidoStockTests {
         assertThat(existencias.findById("gas-5kg").orElseThrow().getStock()).isEqualTo(1);
     }
 
+    @Test
+    void publicaDocumentacionYRechazaConsultaSinToken() throws Exception {
+        assertThat(enviar("GET", "/v3/api-docs", null, null, 200).path("paths").has(PEDIDOS)).isTrue();
+        enviar("GET", PEDIDOS, null, null, 401);
+    }
+
     private static HttpServer catalogo() {
         try {
             HttpServer servidor = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -221,8 +227,8 @@ class PedidoStockTests {
 
     private HttpRequest solicitud(String metodo, String ruta, String correo, String rol, String datos) throws Exception {
         var request = HttpRequest.newBuilder(URI.create("http://localhost:" + puerto + ruta))
-                .method(metodo, datos == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(datos))
-                .header("Authorization", "Bearer " + token(correo, rol));
+                .method(metodo, datos == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(datos));
+        if (correo != null) request.header("Authorization", "Bearer " + token(correo, rol));
         if (datos != null) request.header("Content-Type", "application/json");
         return request.build();
     }

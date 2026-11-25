@@ -38,10 +38,10 @@ public class SeguridadApi {
         byte[] token = tokenInterno.getBytes(StandardCharsets.UTF_8);
         AuthenticationEntryPoint sinSesion = (request, response, error) -> {
             response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
-            enviarError(response, HttpServletResponse.SC_UNAUTHORIZED, "Token de acceso vǭlido requerido.");
+            enviarError(response, HttpServletResponse.SC_UNAUTHORIZED, "Token de acceso válido requerido.");
         };
         AccessDeniedHandler sinPermiso = (request, response, error) ->
-                enviarError(response, HttpServletResponse.SC_FORBIDDEN, "No tienes permiso para esta operaci��n.");
+                enviarError(response, HttpServletResponse.SC_FORBIDDEN, "No tienes permiso para esta operación.");
 
         return http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

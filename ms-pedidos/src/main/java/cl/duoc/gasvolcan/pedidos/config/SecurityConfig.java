@@ -30,10 +30,10 @@ public class SecurityConfig {
     SecurityFilterChain apiSecurity(HttpSecurity http, JwtAuthenticationConverter converter) throws Exception {
         AuthenticationEntryPoint sinSesion = (request, response, error) -> {
             response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
-            responderError(response, HttpServletResponse.SC_UNAUTHORIZED, "Token de acceso vǭlido requerido.");
+            responderError(response, HttpServletResponse.SC_UNAUTHORIZED, "Token de acceso válido requerido.");
         };
         AccessDeniedHandler sinPermiso = (request, response, error) ->
-                responderError(response, HttpServletResponse.SC_FORBIDDEN, "No tienes permiso para esta operaci��n.");
+                responderError(response, HttpServletResponse.SC_FORBIDDEN, "No tienes permiso para esta operación.");
 
         return http
                 .csrf(AbstractHttpConfigurer::disable)

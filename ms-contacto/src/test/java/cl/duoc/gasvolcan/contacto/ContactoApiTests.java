@@ -146,6 +146,15 @@ class ContactoApiTests {
     }
 
     @Test
+    void rechazaTokensConOtroEmisorOCalve() throws Exception {
+        String cuerpo = cuerpo("María", "Consulta sobre horario.", UUID.randomUUID());
+        enviar("POST", RUTA, token("CLIENTE", CORREO, "otro-emisor", new byte[32]), cuerpo, 401);
+        byte[] otraClave = new byte[32];
+        otraClave[0] = 1;
+        enviar("POST", RUTA, token("CLIENTE", CORREO, "gasvolcan-auth", otraClave), cuerpo, 401);
+    }
+
+    @Test
     void documentaLaApiConBearerEnSwagger() throws Exception {
         var api = enviar("GET", "/v3/api-docs", null, null, 200);
         assertThat(api.path("paths").path(RUTA).has("post")).isTrue();
@@ -178,13 +187,17 @@ class ContactoApiTests {
     }
 
     private String token(String rol, String correo) throws Exception {
+        return token(rol, correo, "gasvolcan-auth", new byte[32]);
+    }
+
+    private String token(String rol, String correo, String emisor, byte[] clave) throws Exception {
         var base64 = Base64.getUrlEncoder().withoutPadding();
         String cabecera = base64.encodeToString("{\"alg\":\"HS256\"}".getBytes(StandardCharsets.UTF_8));
-        String claims = base64.encodeToString(json.writeValueAsBytes(Map.of("iss", "gasvolcan-auth",
+        String claims = base64.encodeToString(json.writeValueAsBytes(Map.of("iss", emisor,
                 "sub", correo, "rol", rol, "exp", Instant.now().plusSeconds(180).getEpochSecond())));
         String entrada = cabecera + "." + claims;
         Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(new byte[32], "HmacSHA256"));
+        mac.init(new SecretKeySpec(clave, "HmacSHA256"));
         return entrada + "." + base64.encodeToString(mac.doFinal(entrada.getBytes(StandardCharsets.UTF_8)));
     }
 }
