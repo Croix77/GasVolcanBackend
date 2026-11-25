@@ -9,5 +9,6 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
 	Optional<Usuario> findByCorreoIgnoreCase(String correo);
 
+	boolean existsByRolAndHabilitadoTrue(String rol);
 	List<Usuario> findAllByRolAndHabilitadoTrueOrderByNombreAscCorreoAsc(String rol);
 }

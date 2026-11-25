@@ -28,12 +28,21 @@ public record PedidoRespuesta(
     public record ItemRespuesta(String id, String nombre, int precioUnitario, int cantidad, long subtotal) {}
 
     public static PedidoRespuesta desde(Pedido pedido) {
+        return desde(pedido, true);
+    }
+
+    public static PedidoRespuesta desde(Pedido pedido, boolean incluirDatosEntrega) {
         List<ItemRespuesta> items = pedido.getItems().stream()
             .map(item -> new ItemRespuesta(
                 item.getProductoId(), item.getNombre(), item.getPrecioUnitario(),
                 item.getCantidad(), item.getSubtotal()))
             .toList();
 
+        if (!incluirDatosEntrega) {
+            return new PedidoRespuesta(pedido.getId(), null, null, null, null, pedido.getComuna(),
+                pedido.getEstado(), null, items, pedido.getTotal(), pedido.getFechaCreacion(),
+                pedido.getFechaEntrega(), pedido.isPagoEfectivo(), null, null, null, null, null);
+        }
         return new PedidoRespuesta(pedido.getId(), pedido.getCorreoCliente(), pedido.getNombre(),
             pedido.getTelefono(), pedido.getDireccion(), pedido.getComuna(), pedido.getEstado(),
             pedido.getCorreoRepartidor(), items, pedido.getTotal(), pedido.getFechaCreacion(),

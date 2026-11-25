@@ -95,8 +95,9 @@ public class PedidoService {
                 criterios.greaterThanOrEqualTo(pedido.get("fechaCreacion"), inicio),
                 criterios.lessThan(pedido.get("fechaCreacion"), fin)));
         }
+        boolean incluirDatosEntrega = !tieneRol(usuario, "VENDEDOR");
         return pedidos.findAll(alcance, Sort.by(Sort.Direction.DESC, "fechaCreacion", "id")).stream()
-            .map(PedidoRespuesta::desde)
+            .map(pedido -> PedidoRespuesta.desde(pedido, incluirDatosEntrega))
             .toList();
     }
 
@@ -104,7 +105,7 @@ public class PedidoService {
     public PedidoRespuesta buscar(Long id, Authentication usuario) {
         Specification<Pedido> porId = (pedido, consulta, criterios) -> criterios.equal(pedido.get("id"), id);
         return pedidos.findOne(porId.and(alcanceDe(usuario)))
-            .map(PedidoRespuesta::desde)
+            .map(pedido -> PedidoRespuesta.desde(pedido, !tieneRol(usuario, "VENDEDOR")))
             .orElseThrow(() -> pedidoNoEncontrado(id));
     }
 

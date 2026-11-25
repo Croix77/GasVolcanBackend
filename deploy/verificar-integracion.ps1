@@ -132,7 +132,7 @@ try {
     $usarSemillas = if ($LegacyJar) { 'false' } else { 'true' }
 
     $inicializacion = Abrir-Proceso $mysqlServer @('--no-defaults','--initialize-insecure',('--basedir="' + $mysqlHome + '"'),('--datadir="' + $datosMysql + '"')) 'mysql-init'
-    if (!$inicializacion.WaitForExit(45000) -or $inicializacion.ExitCode -ne 0) { throw 'No se pudo inicializar MySQL temporal.' }
+    if (!$inicializacion.WaitForExit(90000) -or $inicializacion.ExitCode -ne 0) { throw 'No se pudo inicializar MySQL temporal.' }
     @"
 CREATE DATABASE gas_volcan_auth CHARACTER SET utf8mb4;
 CREATE DATABASE gas_volcan_categorias CHARACTER SET utf8mb4;
@@ -160,7 +160,7 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
     $jdbc = "jdbc:mysql://127.0.0.1:$dbPort"
     $opcionesJdbc = 'allowPublicKeyRetrieval=true&sslMode=DISABLED'
     $auth = Abrir-Jar $authJar 'auth' @{
-        AUTH_PORT="$authPort"; JWT_SECRET=$jwt; SPRING_PROFILES_ACTIVE='local'
+        AUTH_PORT="$authPort"; JWT_SECRET=$jwt; SPRING_PROFILES_ACTIVE='prod'; AUTH_DB_DDL_AUTO='update'
         AUTH_DB_URL="$jdbc/gas_volcan_auth?$opcionesJdbc"; AUTH_DB_USER='auth_ensayo'; AUTH_DB_PASSWORD=$authDbClave
         AUTH_BOOTSTRAP_ADMIN='true'; AUTH_ADMIN_NAME='Persona admin'; AUTH_ADMIN_EMAIL=$adminCorreo; AUTH_ADMIN_PASSWORD=$adminClave
     }
@@ -198,6 +198,7 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
 
     $login = "$authBase/api/auth/login"
     $admin = (Llamar 'POST' $login 200 '' @{correo=$adminCorreo;password=$adminClave}).token
+    Probar (![string]::IsNullOrWhiteSpace($admin)) 'Auth crea el primer administrador en el perfil prod cuando se configura'
     $tokens = @{}
     $cuentasIds = @{}
     $cuentas = @{clienteA='CLIENTE';clienteB='CLIENTE';vendedor='VENDEDOR';operadora='OPERADORA';repartidorA='REPARTIDOR';repartidorB='REPARTIDOR'}
@@ -361,6 +362,10 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
     $null = Llamar 'POST' $contactoRuta 403 $tokens.vendedor $consulta
     $null = Llamar 'GET' $contactoRuta 403 $tokens.clienteA
     $null = Llamar 'GET' $contactoRuta 403 $tokens.operadora
+    $pedidoVendedor = Llamar 'GET' "$rutaPedido/$($ganador.id)" 200 $tokens.vendedor
+    $null = Llamar 'GET' "$despacho/$($ganador.id)" 403 $tokens.vendedor
+    Probar ($pedidoVendedor.items.Count -gt 0 -and !$pedidoVendedor.correoCliente -and
+        !$pedidoVendedor.direccion -and $null -eq $pedidoVendedor.latitudEntrega) 'Vendedor consulta el pedido y sus productos sin datos privados de entrega'
     $null = Llamar 'GET' "$($contactoRuta)?pagina=-1" 400 $admin
     $null = Llamar 'POST' $contactoRuta 400 $tokens.clienteA @{nombre='123';mensaje='   corto  ';referencia=[guid]::NewGuid().ToString()}
     $nueva = $consulta.Clone()
@@ -371,6 +376,12 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '$rootDbClave';
     Probar ((($reintento.Estado | Sort-Object) -join ',') -eq '200,201' -and $reintento[0].Datos.id -eq $reintento[1].Datos.id) 'Contacto guarda un único mensaje si el cliente reintenta al mismo tiempo'
     Probar ($bandeja.mensajes.Count -eq 1 -and $bandeja.mensajes[0].nombre -eq $consulta.nombre -and
         $bandeja.mensajes[0].mensaje -eq $consulta.mensaje -and $bandeja.mensajes[0].correo -eq 'clientea@example.test') 'Contacto valida datos y roles y usa el correo verificado de la sesión'
+
+    $null = Llamar 'PATCH' "$authBase/api/auth/usuarios/$($cuentasIds['vendedor'])/estado" 200 $admin @{activo=$false}
+    $null = Llamar 'POST' "$authBase/api/auth/refresh" 401 $tokens.vendedor
+    $null = Llamar 'PATCH' "$authBase/api/auth/usuarios/$($cuentasIds['vendedor'])/estado" 200 $admin @{activo=$true}
+    $null = Llamar 'POST' "$authBase/api/auth/refresh" 401 $tokens.vendedor
+    Probar $true 'Auth impide renovar una sesión revocada incluso después de reactivar la cuenta'
 
     if ($Frontend) {
         if (!$Nginx -or !$Edge) { throw 'Pasa -Nginx y -Edge para comprobar React compilado en navegador.' }
@@ -426,6 +437,13 @@ http {
         }
         Get-Content -LiteralPath (Join-Path $temp 'browser.log')
     }
+    # Se detiene únicamente la instancia temporal de Auth para verificar el JWT local.
+    $auth.Kill()
+    $auth.WaitForExit(5000) | Out-Null
+    $null = Llamar 'GET' $productosRuta 200 $tokens.clienteA
+    $null = Llamar 'GET' "$rutaPedido/$($ganador.id)" 200 $tokens.vendedor
+    $null = Llamar 'GET' "$despacho/$($ganador.id)" 200 $tokens.operadora
+    Probar $true 'Productos, Pedidos y Despacho validan un JWT vigente incluso con Auth detenido'
     $exito = $true
 } finally {
     $http.Dispose()

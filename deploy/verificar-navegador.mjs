@@ -152,6 +152,33 @@ try {
     document.querySelector("h1")?.textContent.includes("Consultas de contacto") &&
     document.body.textContent.includes(texto) && document.body.textContent.includes("clientea@example.test"), mensajeContacto);
   console.log("OK: React envía contacto y la bandeja administrativa carga el mensaje guardado");
+
+  assert(await run(() => {
+    const salir = [...document.querySelectorAll("button")].find((boton) => boton.textContent.trim() === "Cerrar sesión");
+    salir?.click();
+    return !!salir;
+  }));
+  await until("salida de administración", () => location.pathname === "/login");
+  assert(await run(setField, "correo", "vendedor@example.test"));
+  assert(await run(setField, "clave", process.env.SMOKE_CLIENT_PASSWORD));
+  assert(await run(() => { document.querySelector("button[type=submit]").click(); return true; }));
+  await until("vendedor recibe el listado real", () => location.pathname === "/despacho" &&
+    !!document.querySelector("main a[href^='/pedidos/']"));
+  assert(await run(() => {
+    const enlaces = [...document.querySelectorAll("#menu-principal a")].map((enlace) => enlace.textContent.trim());
+    return enlaces.join(",") === "Productos,Pedidos";
+  }));
+  assert(await run(() => {
+    document.querySelector("main a[href^='/pedidos/']").click();
+    return true;
+  }));
+  await until("pedido real con detalle de sus productos", () => location.pathname.startsWith("/pedidos/") &&
+    document.querySelector("h1")?.textContent === "Detalle del pedido" && !!document.querySelector("main li h2"));
+  assert(await run(() => !document.querySelector("main").textContent.includes("Calle Navegador")));
+  await command("Page.navigate", { url: origen + "/categorias" });
+  await until("vendedor tiene acceso restringido a categorías", () =>
+    document.querySelector("h1")?.textContent === "Acceso restringido");
+  console.log("OK: React limita al vendedor a Productos y Pedidos y muestra el detalle real sin datos privados");
 } finally {
   ws.close();
 }
